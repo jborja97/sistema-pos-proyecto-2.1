@@ -2,15 +2,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Select from "react-select";
 import {
   createProduct,
   getProducts,
   updateProduct,
   deleteProduct,
   getTaxes,
-  getSuppliers, // Import getSuppliers
+  getSuppliers,
 } from "../services/api";
-import { Plus, Search, Edit, Trash2, Box, DollarSign, Truck } from "lucide-react"; // Added Truck icon for suppliers
+import { Plus, Search, Edit, Trash2, Box, DollarSign } from "lucide-react";
 
 export default function Productos() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,15 +19,20 @@ export default function Productos() {
   const [products, setProducts] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [availableTaxes, setAvailableTaxes] = useState([]);
-  const [availableSuppliers, setAvailableSuppliers] = useState([]); // New state for available suppliers
+  const [availableSuppliers, setAvailableSuppliers] = useState([]);
+  const [mensajeExito, setMensajeExito] = useState("");
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6; // Cambia este valor si quieres más/menos productos por página
 
   const initialFormState = {
     productName: "",
     productDescription: "",
-    unitaryProductPrice: 0,
+    unitaryProductPrice: "",
     productStock: 0,
-    taxes: [], // Array of selected tax IDs (numbers)
-    suppliers: [], // New: Array of selected supplier IDs (numbers)
+    taxes: [],
+    suppliers: [],
   };
 
   const [form, setForm] = useState(initialFormState);
@@ -34,15 +40,18 @@ export default function Productos() {
   useEffect(() => {
     cargarProductos();
     cargarImpuestosDisponibles();
-    cargarProveedoresDisponibles(); // New: Load available suppliers
+    cargarProveedoresDisponibles();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1); // Reinicia a la página 1 al buscar o cambiar productos
+  }, [searchTerm, products]);
 
   const cargarProductos = async () => {
     try {
       const res = await getProducts();
-      const processedProducts = res.data.map(prod => ({
+      const processedProducts = res.data.map((prod) => ({
         ...prod,
-        // Ensure numerical fields are parsed correctly, default to 0 if invalid
         unitaryProductPrice: parseFloat(prod.unitaryProductPrice) || 0,
         productStock: parseInt(prod.productStock, 10) || 0,
       }));
@@ -61,10 +70,9 @@ export default function Productos() {
     }
   };
 
-  // New function to load available suppliers
   const cargarProveedoresDisponibles = async () => {
     try {
-      const res = await getSuppliers(); // Call your getSuppliers API
+      const res = await getSuppliers();
       setAvailableSuppliers(res.data);
     } catch (error) {
       console.error("Error cargando proveedores disponibles:", error);
@@ -73,38 +81,44 @@ export default function Productos() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    // For number inputs, convert value to a number. Use parseFloat for prices.
-    const newValue = (name === "unitaryProductPrice" || name === "productStock")
-      ? parseFloat(value) || 0 // Default to 0 if parsing fails
-      : value;
+    const newValue =
+      name === "unitaryProductPrice" || name === "productStock"
+        ? parseFloat(value) || ""
+        : value;
     setForm({ ...form, [name]: newValue });
   };
 
-  const handleTaxSelectionChange = (e) => {
-    const selectedOptions = Array.from(e.target.options).filter(option => option.selected);
-    const selectedTaxIds = selectedOptions.map(option => parseInt(option.value, 10));
-    setForm({ ...form, taxes: selectedTaxIds });
-  };
-
-  // New handler for supplier selection
-  const handleSupplierSelectionChange = (e) => {
-    const selectedOptions = Array.from(e.target.options).filter(option => option.selected);
-    const selectedSupplierIds = selectedOptions.map(option => parseInt(option.value, 10));
-    setForm({ ...form, suppliers: selectedSupplierIds });
-  };
-
   const handleGuardar = async () => {
+    if (!form.productName.trim()) {
+      alert("El nombre del producto es obligatorio.");
+      return;
+    }
+    if (form.unitaryProductPrice <= 0) {
+      alert("El precio unitario debe ser mayor a 0.");
+      return;
+    }
+    if (form.productStock < 0) {
+      alert("El stock no puede ser negativo.");
+      return;
+    }
+    if (form.taxes.length === 0) {
+      alert("Debes seleccionar al menos un impuesto.");
+      return;
+    }
+    if (form.suppliers.length === 0) {
+      alert("Debes seleccionar al menos un proveedor.");
+      return;
+    }
     try {
-      const taxesForApi = form.taxes.map(taxId => ({ taxId }));
-      // New: Transform the `suppliers` array from [id1, id2] to [{ supplierId: id1 }, { supplierId: id2 }]
-      const suppliersForApi = form.suppliers.map(supplierId => ({ supplierId }));
-
+      const taxesForApi = form.taxes.map((taxId) => ({ taxId }));
+      const suppliersForApi = form.suppliers.map((supplierId) => ({
+        supplierId,
+      }));
       const productDataToSave = {
         ...form,
         taxes: taxesForApi,
-        suppliers: suppliersForApi, // Add suppliers to the data sent to API
+        suppliers: suppliersForApi,
       };
-
       if (editingProduct) {
         await updateProduct(editingProduct.productId, productDataToSave);
       } else {
@@ -114,9 +128,10 @@ export default function Productos() {
       setEditingProduct(null);
       setForm(initialFormState);
       cargarProductos();
+      setMensajeExito("✅ Producto guardado correctamente");
+      setTimeout(() => setMensajeExito(""), 3000);
     } catch (error) {
       console.error("Error guardando producto:", error);
-      // More specific error handling could be implemented here
     }
   };
 
@@ -125,17 +140,20 @@ export default function Productos() {
     setForm({
       productName: prod.productName,
       productDescription: prod.productDescription,
-      unitaryProductPrice: parseFloat(prod.unitaryProductPrice) || 0, // Ensure number for editing
-      productStock: parseInt(prod.productStock, 10) || 0, // Ensure number for editing
-      taxes: prod.taxes ? prod.taxes.map(tax => tax.taxId) : [],
-      // New: Map supplier objects back to just an array of IDs for the form's select
-      suppliers: prod.suppliers ? prod.suppliers.map(supplier => supplier.supplierId) : [],
+      unitaryProductPrice: parseFloat(prod.unitaryProductPrice) || 0,
+      productStock: parseInt(prod.productStock, 10) || 0,
+      taxes: prod.taxes ? prod.taxes.map((tax) => tax.taxId) : [],
+      suppliers: prod.suppliers
+        ? prod.suppliers.map((supplier) => supplier.supplierId)
+        : [],
     });
     setShowModal(true);
   };
 
   const handleEliminar = async (id) => {
-    if (window.confirm("¿Estás seguro de que quieres eliminar este producto?")) {
+    if (
+      window.confirm("¿Estás seguro de que quieres eliminar este producto?")
+    ) {
       try {
         await deleteProduct(id);
         cargarProductos();
@@ -157,18 +175,30 @@ export default function Productos() {
     setForm(initialFormState);
   };
 
+  // Filtro de búsqueda
   const filteredProducts = products.filter(
     (prod) =>
       prod.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prod.productDescription?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Paginación
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentProducts = filteredProducts.slice(
+    indexOfFirstItem,
+    indexOfLastItem
+  );
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Productos</h1>
-          <p className="text-gray-600">Gestiona la información de tus productos</p>
+          <p className="text-gray-600">
+            Gestiona la información de tus productos
+          </p>
         </div>
         <button
           onClick={handleAddProductClick}
@@ -201,68 +231,120 @@ export default function Productos() {
               <th className="px-4 py-2 text-left">Precio Unitario</th>
               <th className="px-4 py-2 text-left">Stock</th>
               <th className="px-4 py-2 text-left">Impuestos</th>
-              <th className="px-4 py-2 text-left">Proveedores</th> {/* New Column */}
+              <th className="px-4 py-2 text-left">Proveedores</th>
               <th className="px-4 py-2 text-left">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {filteredProducts.map((prod) => (
-              <tr key={prod.productId}>
-                <td className="px-4 py-2 flex items-center gap-2">
-                  <Box className="h-5 w-5 text-gray-500" />
-                  <div className="font-medium">{prod.productName}</div>
-                </td>
-                <td className="px-4 py-2">{prod.productDescription}</td>
-                <td className="px-4 py-2">
-                  <DollarSign className="inline-block h-4 w-4 text-gray-500 mr-1" />
-                  {/* Safely display price, ensuring it's a number */}
-                  {typeof prod.unitaryProductPrice === 'number'
-                    ? prod.unitaryProductPrice.toFixed(2)
-                    : parseFloat(prod.unitaryProductPrice)?.toFixed(2) || 'N/A'}
-                </td>
-                <td className="px-4 py-2">{prod.productStock}</td>
-                <td className="px-4 py-2">
-                  {prod.taxes && prod.taxes.length > 0
-                    ? prod.taxes.map(tax => tax.taxName).join(", ")
-                    : "N/A"}
-                </td>
-                <td className="px-4 py-2"> {/* New: Display Suppliers */}
-                  {prod.suppliers && prod.suppliers.length > 0
-                    ? prod.suppliers.map(supplier => supplier.supplierName).join(", ")
-                    : "N/A"}
-                </td>
-                <td className="px-4 py-2 space-x-2">
-                  <button
-                    onClick={() => handleEditar(prod)}
-                    className="text-blue-600 hover:text-blue-900"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleEliminar(prod.productId)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+            {currentProducts.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="text-center py-6 text-gray-400">
+                  No hay productos para mostrar.
                 </td>
               </tr>
-            ))}
+            ) : (
+              currentProducts.map((prod) => (
+                <tr key={prod.productId}>
+                  <td className="px-4 py-2 flex items-center gap-2 truncate">
+                    <Box className="h-5 w-5 text-gray-500" />
+                    <div className="font-medium">{prod.productName}</div>
+                  </td>
+                  <td className="px-4 py-2">{prod.productDescription}</td>
+                  <td className="px-4 py-2 flex items-center gap-2 truncate">
+                    <DollarSign className=" h-5 w-5 text-gray-500" />
+                    {typeof prod.unitaryProductPrice === "number"
+                      ? new Intl.NumberFormat("es-CO", {
+                          style: "currency",
+                          currency: "COP",
+                          minimumFractionDigits: 0,
+                        }).format(prod.unitaryProductPrice)
+                      : "N/A"}
+                  </td>
+                  <td className="px-4 py-2">{prod.productStock}</td>
+                  <td className="px-4 py-2">
+                    {prod.taxes && prod.taxes.length > 0
+                      ? prod.taxes.map((tax) => tax.taxName).join(", ")
+                      : "N/A"}
+                  </td>
+                  <td className="px-4 py-2">
+                    {prod.suppliers && prod.suppliers.length > 0
+                      ? prod.suppliers
+                          .map((supplier) => supplier.supplierName)
+                          .join(", ")
+                      : "N/A"}
+                  </td>
+                  <td className="px-4 py-2 space-x-2">
+                    <button
+                      onClick={() => handleEditar(prod)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleEliminar(prod.productId)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Modal for adding/editing a product */}
+      {/* Controles de paginación */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-4">
+          <button
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button
+              key={i + 1}
+              onClick={() => setCurrentPage(i + 1)}
+              className={`px-3 py-1 border rounded ${
+                currentPage === i + 1
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-700"
+              }`}
+            >
+              {i + 1}
+            </button>
+          ))}
+          <button
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+            }
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
+
+      {/* Modal para agregar/editar producto */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
             <h3 className="text-lg font-semibold mb-4">
               {editingProduct ? "Editar Producto" : "Nuevo Producto"}
             </h3>
-
-            <div className="space-y-4">
-              {/* Product Name */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Nombre del producto */}
               <div>
-                <label htmlFor="productName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto</label>
+                <label
+                  htmlFor="productName"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Nombre del Producto
+                </label>
                 <input
                   id="productName"
                   name="productName"
@@ -272,10 +354,33 @@ export default function Productos() {
                   className="w-full border p-2 rounded"
                 />
               </div>
-
-              {/* Product Description */}
+              {/* Precio unitario */}
               <div>
-                <label htmlFor="productDescription" className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                <label
+                  htmlFor="unitaryProductPrice"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Precio Unitario
+                </label>
+                <input
+                  id="unitaryProductPrice"
+                  name="unitaryProductPrice"
+                  value={form.unitaryProductPrice}
+                  onChange={handleInputChange}
+                  placeholder="Ej: $3.200"
+                  type="number"
+                  step="0.01"
+                  className="w-full border p-2 rounded"
+                />
+              </div>
+              {/* Descripción del producto */}
+              <div className="md:col-span-2">
+                <label
+                  htmlFor="productDescription"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Descripción
+                </label>
                 <textarea
                   id="productDescription"
                   name="productDescription"
@@ -283,28 +388,17 @@ export default function Productos() {
                   onChange={handleInputChange}
                   placeholder="Ej: Paquete de arroz blanco tradicional de 1 kilogramo"
                   className="w-full border p-2 rounded resize-y"
-                  rows="3"
+                  rows="2"
                 ></textarea>
               </div>
-
-              {/* Unitary Product Price */}
+              {/* Stock */}
               <div>
-                <label htmlFor="unitaryProductPrice" className="block text-sm font-medium text-gray-700 mb-1">Precio Unitario</label>
-                <input
-                  id="unitaryProductPrice"
-                  name="unitaryProductPrice"
-                  value={form.unitaryProductPrice}
-                  onChange={handleInputChange}
-                  placeholder="Ej: 3200.00"
-                  type="number"
-                  step="0.01"
-                  className="w-full border p-2 rounded"
-                />
-              </div>
-
-              {/* Product Stock */}
-              <div>
-                <label htmlFor="productStock" className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                <label
+                  htmlFor="productStock"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Stock
+                </label>
                 <input
                   id="productStock"
                   name="productStock"
@@ -316,49 +410,69 @@ export default function Productos() {
                   className="w-full border p-2 rounded"
                 />
               </div>
-
-              {/* Taxes Selection */}
+              {/* Impuestos */}
               <div>
-                <label htmlFor="taxes" className="block text-sm font-medium text-gray-700 mb-1">Impuestos Aplicables</label>
-                <select
+                <label
+                  htmlFor="taxes"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Impuestos Aplicables
+                </label>
+                <Select
+                  isMulti
                   id="taxes"
                   name="taxes"
-                  multiple
-                  value={form.taxes}
-                  onChange={handleTaxSelectionChange}
-                  className="w-full border p-2 rounded h-32"
-                >
-                  {availableTaxes.map(tax => (
-                    <option key={tax.taxId} value={tax.taxId}>
-                      {tax.taxName} ({tax.taxPercentage}%)
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">Mantén "Ctrl" (Windows) o "Cmd" (Mac) presionado para seleccionar múltiples impuestos.</p>
+                  className="text-sm"
+                  options={availableTaxes.map((tax) => ({
+                    value: tax.taxId,
+                    label: `${tax.taxName} (${tax.taxPercentage}%)`,
+                  }))}
+                  value={availableTaxes
+                    .filter((tax) => form.taxes.includes(tax.taxId))
+                    .map((tax) => ({
+                      value: tax.taxId,
+                      label: `${tax.taxName} (${tax.taxPercentage}%)`,
+                    }))}
+                  onChange={(selectedOptions) => {
+                    const selectedTaxIds = selectedOptions.map(
+                      (option) => option.value
+                    );
+                    setForm({ ...form, taxes: selectedTaxIds });
+                  }}
+                />
               </div>
-
-              {/* New: Suppliers Selection */}
-              <div>
-                <label htmlFor="suppliers" className="block text-sm font-medium text-gray-700 mb-1">Proveedores</label>
-                <select
+              {/* Proveedores */}
+              <div className="md:col-span-2">
+                <label
+                  htmlFor="suppliers"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Proveedores
+                </label>
+                <Select
+                  isMulti
                   id="suppliers"
                   name="suppliers"
-                  multiple
-                  value={form.suppliers}
-                  onChange={handleSupplierSelectionChange}
-                  className="w-full border p-2 rounded h-32"
-                >
-                  {availableSuppliers.map(supplier => (
-                    <option key={supplier.supplierId} value={supplier.supplierId}>
-                      {supplier.supplierName} ({supplier.supplierNit})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">Mantén "Ctrl" (Windows) o "Cmd" (Mac) presionado para seleccionar múltiples proveedores.</p>
+                  className="text-sm"
+                  options={availableSuppliers.map((supplier) => ({
+                    value: supplier.supplierId,
+                    label: `${supplier.supplierName} (${supplier.supplierNit})`,
+                  }))}
+                  value={availableSuppliers
+                    .filter((sup) => form.suppliers.includes(sup.supplierId))
+                    .map((sup) => ({
+                      value: sup.supplierId,
+                      label: `${sup.supplierName} (${sup.supplierNit})`,
+                    }))}
+                  onChange={(selectedOptions) => {
+                    const selectedSupplierIds = selectedOptions.map(
+                      (option) => option.value
+                    );
+                    setForm({ ...form, suppliers: selectedSupplierIds });
+                  }}
+                />
               </div>
-
             </div>
-
             <div className="flex justify-end mt-6 gap-2">
               <button
                 onClick={handleCancel}
@@ -374,6 +488,11 @@ export default function Productos() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {mensajeExito && (
+        <div className="fixed top-6 right-6 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 text-sm animate-fade-in">
+          {mensajeExito}
         </div>
       )}
     </div>

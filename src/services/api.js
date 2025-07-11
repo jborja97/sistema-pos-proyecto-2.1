@@ -67,6 +67,7 @@ export const deleteSaleDetail = (id) => API.delete(`/sale-detail/${id}`);
 // Sale...Ventas
 export const createSale = (data) => API.post("/sale", data);
 export const getSales = () => API.get("/sale");
+export const getPaymentMethods = () => API.get("/sale");
 export const getSaleById = (id) => API.get(`/sale/${id}`);
 export const updateSale = (id, data) => API.patch(`/sale/${id}`, data);
 export const deleteSale = (id) => API.delete(`/sale/${id}`);

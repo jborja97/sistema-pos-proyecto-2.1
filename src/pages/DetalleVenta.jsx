@@ -346,7 +346,7 @@ export default function DetallesVenta() {
                 <input
                   id="unitaryPrice"
                   name="unitaryPrice"
-                  value={form.unitaryPrice.toFixed(2)}
+                  value={form.unitaryPrice || (selectedProductData ? selectedProductData.unitaryProductPrice : 0)}
                   readOnly // This field is derived
                   className="w-full border p-2 rounded bg-gray-100 cursor-not-allowed"
                 />

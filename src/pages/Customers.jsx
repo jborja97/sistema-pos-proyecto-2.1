@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,7 +6,7 @@ import {
   getCustomers,
   updateCustomer,
   deleteCustomer,
-} from "../services/api"; 
+} from "../services/api";
 import {
   Plus,
   Search,
@@ -17,14 +16,20 @@ import {
   Mail,
   Phone,
   MapPin,
-  CreditCard, 
+  CreditCard,
+  FileDown,
 } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 export default function Clientes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [customers, setCustomers] = useState([]); 
-  const [editingCustomer, setEditingCustomer] = useState(null); 
+  const [customers, setCustomers] = useState([]);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   const initialFormState = {
     customerName: "",
@@ -45,7 +50,7 @@ export default function Clientes() {
       const res = await getCustomers();
       setCustomers(res.data);
     } catch (error) {
-      console.error("Error cargando clientes:", error);
+      toast.error("Error cargando clientes");
     }
   };
 
@@ -58,15 +63,17 @@ export default function Clientes() {
     try {
       if (editingCustomer) {
         await updateCustomer(editingCustomer.customerId, form);
+        toast.success("Cliente actualizado");
       } else {
         await createCustomer(form);
+        toast.success("Cliente creado");
       }
       setShowModal(false);
       setEditingCustomer(null);
       setForm(initialFormState);
-      cargarClientes(); 
+      cargarClientes();
     } catch (error) {
-      console.error("Error guardando cliente:", error);
+      toast.error("Error guardando cliente");
     }
   };
 
@@ -86,9 +93,10 @@ export default function Clientes() {
     if (window.confirm("¿Estás seguro de que quieres eliminar este cliente?")) {
       try {
         await deleteCustomer(id);
+        toast.success("Cliente eliminado");
         cargarClientes();
       } catch (error) {
-        console.error("Error eliminando cliente:", error);
+        toast.error("Error eliminando cliente");
       }
     }
   };
@@ -105,106 +113,138 @@ export default function Clientes() {
     setForm(initialFormState);
   };
 
-  const filteredCustomers = customers.filter(
-    (customer) =>
-      customer.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.customerIdentification
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      customer.customerEmail
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      customer.customerPhone
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      customer.customerAddress?.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleExportExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(filteredCustomers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+
+    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const data = new Blob([excelBuffer], { type: "application/octet-stream" });
+    saveAs(data, "clientes.xlsx");
+  };
+
+  const filteredCustomers = customers.filter((customer) =>
+    [
+      customer.customerName,
+      customer.customerIdentification,
+      customer.customerEmail,
+      customer.customerPhone,
+      customer.customerAddress,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+  const currentCustomers = filteredCustomers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <Toaster position="top-right" />
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="text-gray-600">
             Gestiona la información de tus clientes
           </p>
         </div>
-        <button
-          onClick={handleAddCustomerClick}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo Cliente
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportExcel}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700"
+          >
+            <FileDown className="h-4 w-4" />
+            Exportar Excel
+          </button>
+          <button
+            onClick={handleAddCustomerClick}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo Cliente
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white border p-4 rounded-xl shadow-sm flex justify-between">
-        <div className="relative w-full max-w-md">
+      <div className="bg-white border p-4 rounded-xl shadow-sm">
+        <div className="relative max-w-md w-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <input
             type="text"
             placeholder="Buscar clientes..."
             className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-blue-500"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1); // reset page when searching
+            }}
           />
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-x-auto">
-        <table className="min-w-full ">
-          <thead className="bg-gray-100">
+      <div className="bg-white max-w-full max-h-[500px] overflow-auto border rounded-lg shadow" >
+        <table className="min-w-[800px] table-auto border-collapse w-full">
+          <thead className="bg-gray-200 sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-2 text-left w-[120px]">Cliente</th>
-              <th className="px-4 py-2 text-left w-[120px]">Identificación</th>
-              <th className="px-4 py-2 text-left w-[120px]">Email</th>
-              <th className="px-4 py-2 text-left w-[120px]">Teléfono</th>
-              <th className="px-4 py-2 text-left w-[120px]">Dirección</th>
-              <th className="px-4 py-2 text-left w-[120px]">Acciones</th>
+              <th className="border p-2">Cliente</th>
+              <th className="border p-2">Identificación</th>
+              <th className="border p-2">Email</th>
+              <th className="border p-2">Teléfono</th>
+              <th className="border p-2">Dirección</th>
+              <th className="border p-2">Acciones</th>
             </tr>
           </thead>
-
-          <tbody className="divide-y ">
-            {filteredCustomers.length === 0 ? (
+          <tbody>
+            {currentCustomers.length === 0 ? (
               <tr>
                 <td colSpan="6" className="text-center py-6 text-gray-500">
                   No se encontraron clientes.
                 </td>
               </tr>
             ) : (
-              filteredCustomers.map((customer, index) => (
+              currentCustomers.map((customer, index) => (
                 <tr
                   key={customer.customerId}
                   className={`hover:bg-gray-50 transition-colors ${
                     index % 2 === 0 ? "bg-white" : "bg-gray-50"
                   }`}
                 >
-                <td className="px-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis">
-                    <User className="h-5 w-5 text-gray-500" />
-                    {customer.customerName}
+                  <td className="border p-2">
+                    <div className="flex items-center gap-2">
+                      <User className="text-gray-500 w-4 h-4" />
+                      {customer.customerName}
+                    </div>
                   </td>
 
-                <td className="px-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis">
-                    <CreditCard className="h-4 w-4 text-gray-500" />
-                    {customer.customerIdentification}
+                  <td className="border  p-2">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="text-gray-500 w-4 h-4" />
+                      {customer.customerIdentification}
+                    </div>
                   </td>
-
-                <td className="px-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis">
-                    <Mail className="h-4 w-4 text-gray-500" />
-                    {customer.customerEmail}
+                  <td className="border p-2">
+                    <div className="flex items-center gap-2">
+                      <Mail className="text-gray-500 w-4 h-4" />
+                      {customer.customerEmail}
+                    </div>
                   </td>
-
-                <td className="px-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis">
-                    <Phone className="h-4 w-4 text-gray-500" />
-                    {customer.customerPhone}
+                  <td className="border p-2">
+                    <div className="flex items-center gap-2">
+                      <Phone className="text-gray-500 w-4 h-4" />
+                      {customer.customerPhone}
+                    </div>
                   </td>
-
-                <td className="px-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis">
-                    <MapPin className="h-4 w-4 text-gray-500" />
-                    {customer.customerAddress}
+                  <td className="border p-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="text-gray-500 w-4 h-4" />
+                      {customer.customerAddress}
+                    </div>
                   </td>
-
-                  <td className="px-4 py-2 space-x-2">
+                  <td className="border p-2 space-x-2">
                     <button
                       onClick={() => handleEditar(customer)}
                       className="text-blue-600 hover:text-blue-800"
@@ -227,6 +267,30 @@ export default function Clientes() {
         </table>
       </div>
 
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center mt-4 space-x-2">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(currentPage - 1)}
+            className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span>
+            Página {currentPage} de {totalPages}
+          </span>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(currentPage + 1)}
+            className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
+
+      {/* MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
@@ -235,92 +299,56 @@ export default function Clientes() {
             </h3>
 
             <div className="space-y-4">
+              {[
+                {
+                  label: "Nombre Completo",
+                  name: "customerName",
+                  placeholder: "Ej: María Ríos",
+                },
+                {
+                  label: "Identificación",
+                  name: "customerIdentification",
+                  placeholder: "Ej: 12345678",
+                },
+                {
+                  label: "Email",
+                  name: "customerEmail",
+                  placeholder: "Ej: maria@gmail.com",
+                  type: "email",
+                },
+                {
+                  label: "Teléfono",
+                  name: "customerPhone",
+                  placeholder: "Ej: +57 300 4567890",
+                  type: "tel",
+                },
+              ].map(({ label, name, placeholder, type = "text" }) => (
+                <div key={name}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {label}
+                  </label>
+                  <input
+                    name={name}
+                    value={form[name]}
+                    onChange={handleInputChange}
+                    placeholder={placeholder}
+                    type={type}
+                    className="w-full border p-2 rounded"
+                  />
+                </div>
+              ))}
               <div>
-                <label
-                  htmlFor="customerName"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Nombre Completo
-                </label>
-                <input
-                  id="customerName"
-                  name="customerName"
-                  value={form.customerName}
-                  onChange={handleInputChange}
-                  placeholder="Ej: María Fernanda Ríos"
-                  className="w-full border p-2 rounded"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="customerIdentification"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Identificación
-                </label>
-                <input
-                  id="customerIdentification"
-                  name="customerIdentification"
-                  value={form.customerIdentification}
-                  onChange={handleInputChange}
-                  placeholder="Ej: 1032456789"
-                  className="w-full border p-2 rounded"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="customerEmail"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Email
-                </label>
-                <input
-                  id="customerEmail"
-                  name="customerEmail"
-                  value={form.customerEmail}
-                  onChange={handleInputChange}
-                  placeholder="Ej: maria.rios@gmail.com"
-                  type="email"
-                  className="w-full border p-2 rounded"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="customerPhone"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Teléfono
-                </label>
-                <input
-                  id="customerPhone"
-                  name="customerPhone"
-                  value={form.customerPhone}
-                  onChange={handleInputChange}
-                  placeholder="Ej: +57 300 4567890"
-                  type="tel"
-                  className="w-full border p-2 rounded"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="customerAddress"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Dirección
                 </label>
                 <textarea
-                  id="customerAddress"
                   name="customerAddress"
                   value={form.customerAddress}
                   onChange={handleInputChange}
-                  placeholder="Ej: Cra 10 #45-23, Bogotá"
+                  placeholder="Ej: Cra 10 #45-23"
                   className="w-full border p-2 rounded resize-y"
                   rows="2"
-                ></textarea>
+                />
               </div>
             </div>
 
