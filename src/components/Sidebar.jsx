@@ -27,7 +27,7 @@ const menuItems = [
   { path: "/dashboard/sales", label: "Sales", icon: Package },
   { path: "/dashboard/detailsales", label: "Detail Sales", icon: Receipt },
   { path: "/dashboard/sedes", label: "Sedes", icon: Building2 },
-  { path: "/dashboard/impuestos", label: "Impuestos", icon: Percent },
+  { path: "/dashboard/inventory", label: "Inventario", icon: Percent },
   { path: "/dashboard/company", label: "Company", icon: Truck },
   { path: "/dashboard/categorias", label: "Categorías", icon: Tags },
 ];

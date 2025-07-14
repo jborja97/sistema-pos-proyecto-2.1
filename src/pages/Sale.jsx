@@ -7,14 +7,12 @@ import { jwtDecode } from "jwt-decode";
 
 import {
   getSales,
-  getSaleDetails,
   getProducts,
   createSaleDetail,
   getCustomers,
   getEmployees,
-} from "../services/api"; // Assuming '../services/api' exists
+} from "../services/api"; 
 
-// Constants for currency formatting
 const CURRENCY_OPTIONS = {
   style: "currency",
   currency: "COP",
@@ -22,22 +20,18 @@ const CURRENCY_OPTIONS = {
 };
 
 export default function Ventas() {
-  // --- State Management ---
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [currentEmployee, setCurrentEmployee] = useState(null);
 
-  // Modals and Visibility
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [isAddSaleModalVisible, setIsAddSaleModalVisible] = useState(false);
 
-  // Selected Sale Details
   const [selectedSale, setSelectedSale] = useState(null);
-  const [saleDetails, setSaleDetails] = useState([]);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [saleDetails, setSaleDetails] = useState([]); // Initialize as an empty array
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false); 
 
-  // New Sale Form
   const [newSaleForm, setNewSaleForm] = useState({
     employeeId: 0,
     headquarterId: 0,
@@ -49,7 +43,6 @@ export default function Ventas() {
     total: 0,
   });
 
-  // --- Derived State (useMemo) ---
   const decodedToken = useMemo(() => {
     const token = localStorage.getItem("token");
     return token ? jwtDecode(token) : null;
@@ -102,12 +95,11 @@ export default function Ventas() {
   }, [calculateSaleTotals]);
 
   useEffect(() => {
-    // Initial data loading
     fetchSales();
     fetchCustomers();
     fetchProducts();
     fetchCurrentEmployee();
-  }, []); // Empty dependency array means this runs once on mount
+  }, []); 
 
   // --- Data Fetching Functions ---
   const fetchSales = useCallback(async () => {
@@ -127,7 +119,6 @@ export default function Ventas() {
       setSales(processedSales);
     } catch (error) {
       console.error("Error fetching sales:", error);
-      // TODO: Implement user-friendly error notification
     }
   }, []);
 
@@ -205,7 +196,7 @@ export default function Ventas() {
         employeeId,
         headquarterId,
         saleDate,
-        paymentMethods: [{ paymentMethodId: 1 }], // Assuming a default payment method
+        paymentMethods: [{ paymentMethodId: 1 }], 
         products: saleProducts.map((p) => ({
           productId: p.productId,
           amount: p.quantity,
@@ -215,7 +206,6 @@ export default function Ventas() {
         totalSale: totals.total,
       });
 
-      // Reset form to initial state for a new sale
       setNewSaleForm({
         employeeId: currentEmployee?.employeeId || 0,
         headquarterId: currentEmployee?.headquarter?.headquarterId || 0,
@@ -227,27 +217,20 @@ export default function Ventas() {
         total: 0,
       });
       setIsAddSaleModalVisible(false);
-      fetchSales(); // Refresh sales list
+      fetchSales(); 
     } catch (error) {
       console.error("Error saving new sale:", error);
       alert("Failed to save sale. Please try again.");
     }
   };
 
-  // --- Handlers for Sale Details ---
+  // --- MODIFIED showSaleDetails function ---
   const showSaleDetails = async (sale) => {
     setSelectedSale(sale);
     setIsDetailModalVisible(true);
-    setIsLoadingDetails(true);
-    try {
-      const res = await getSaleDetails(sale.saleId);
-      setSaleDetails(res.data);
-    } catch (err) {
-      console.error("Error loading sale details:", err);
-      alert("Failed to load sale details.");
-    } finally {
-      setIsLoadingDetails(false);
-    }
+    
+    setSaleDetails(Array.isArray(sale.saleDetails) ? sale.saleDetails : []);
+    setIsLoadingDetails(false); 
   };
 
   const printSaleDetails = () => {
@@ -521,14 +504,12 @@ export default function Ventas() {
                 <h3 className="text-lg font-semibold mb-3">Products Purchased</h3>
                 {isLoadingDetails ? (
                   <p className="text-center text-gray-600">Loading details...</p>
-                ) : saleDetails.length === 0 ? (
-                  <p className="text-center text-gray-600">No products found for this sale.</p>
-                ) : (
+                ) : Array.isArray(saleDetails) && saleDetails.length > 0 ? (
                   <table className="min-w-full border border-gray-300 rounded-md overflow-hidden">
                     <thead className="bg-gray-100">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Qty</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Description</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Product Name</th>
                         <th className="px-4 py-2 text-right text-xs font-medium text-gray-600 uppercase">Unit Price</th>
                         <th className="px-4 py-2 text-right text-xs font-medium text-gray-600 uppercase">Total</th>
                       </tr>
@@ -537,17 +518,20 @@ export default function Ventas() {
                       {saleDetails.map((detail) => (
                         <tr key={detail.saleDetailId} className="border-t border-gray-200">
                           <td className="px-4 py-2 text-sm text-gray-900">{detail.amount}</td>
+                          {/* Access product name from nested product object */}
                           <td className="px-4 py-2 text-sm text-gray-900">{detail?.product?.productName || "N/A"}</td>
                           <td className="px-4 py-2 text-right text-sm text-gray-900">
-                            {(detail.unitaryPrice || 0).toLocaleString("es-CO", CURRENCY_OPTIONS)}
+                            {(parseFloat(detail.unitaryPrice) || 0).toLocaleString("es-CO", CURRENCY_OPTIONS)}
                           </td>
                           <td className="px-4 py-2 text-right text-sm text-gray-900">
-                            {(detail.total || 0).toLocaleString("es-CO", CURRENCY_OPTIONS)}
+                            {(parseFloat(detail.total) || 0).toLocaleString("es-CO", CURRENCY_OPTIONS)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                ) : (
+                  <p className="text-center text-gray-600">No products found for this sale.</p>
                 )}
               </section>
 

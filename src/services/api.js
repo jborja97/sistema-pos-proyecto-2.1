@@ -8,6 +8,27 @@ const API = axios.create({
 export const login = (userEmail, userPassword) =>
   API.post("/auth/login", { userEmail, userPassword })
 
+// Permission...Permisos
+export const getPermissions = () => API.get("/permission");
+
+// User...Usuarios
+export const createUser = (data) => API.post("/user", data);
+export const getUsers = () => API.get("/user");
+export const getUserById = (id) => API.get(`/user/${id}`);
+export const updateUser = (id, data) => API.patch(`/user/${id}`, data);
+export const deleteUser = (id) => API.delete(`/user/${id}`);
+export const restoreUser = (id) => API.patch(`/user/restore/${id}`);
+
+
+// Role...Roles
+export const createRole = (data) => API.post("/role", data);
+export const getRoles = () => API.get("/role");
+export const getRoleById = (id) => API.get(`/role/${id}`);
+export const updateRole = (id, data) => API.patch(`/role/${id}`, data);
+export const deleteRole = (id) => API.delete(`/role/${id}`);
+
+
+
 // HEADQUARTER..Sedes
 export const createHeadquarter = (data) => API.post("/headquarter", data);
 export const getHeadquarters = () => API.get("/headquarter");
@@ -72,4 +93,18 @@ export const getSaleById = (id) => API.get(`/sale/${id}`);
 export const updateSale = (id, data) => API.patch(`/sale/${id}`, data);
 export const deleteSale = (id) => API.delete(`/sale/${id}`);
 
+// InventoryDetail...
+export const createInventoryDetail = (employeeId, data) => API.post(`/inventory-detail/${employeeId}`, data);
+export const getInventoryDetails = () => API.get("/inventory-detail");
+export const getInventoryDetailById = (id) => API.get(`/inventory-detail/${id}`);
+export const updateInventoryDetail = (id, data) => API.patch(`/inventory-detail/${id}`, data);
+
+// Report...Reportes
+export const getReportInvoice = (id) => API.get(`/report/invoice/${id}`);
+export const getReportInventoryPdf = (id) => API.get(`/report/inventory/pdf/${id}`);
+export const createReportInventoryPdf = (id, data) => API.post(`/report/inventory/pdf/${id}`, data);
+export const getReportInventoryPdfs = () => API.get("/report/inventory/pdfs");
+
+// Inventory...Inventario
+export const getInventory = () => API.get("/inventory");
 export default API

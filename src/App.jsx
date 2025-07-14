@@ -12,11 +12,12 @@ import Categorias from "./pages/Categorias"
 import Ordenes from "./pages/Ordenes"
 import Company from "./pages/Company"
 import Sedes from "./pages/Sedes"
-import Impuestos from "./pages/Impuestos"
 import DetalleVenta from "./pages/DetalleVenta"
 import Usuarios from "./pages/Usuarios" 
 import Customers from "./pages/Customers"
 import Sale from "./pages/Sale"
+import InventoryManagement from './pages/Inventory'// Adjust path
+
 
 
 export default function App() {
@@ -47,7 +48,7 @@ export default function App() {
           <Route path="detailsales" element={<DetalleVenta />} />
           <Route path="company" element={<Company />} />
           <Route path="sedes" element={<Sedes />} />
-          <Route path="impuestos" element={<Impuestos />} />
+          <Route path="inventory" element={<InventoryManagement />} />
         </Route>
 
         <Route path="*" element={<Login />} />

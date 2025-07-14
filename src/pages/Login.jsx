@@ -23,7 +23,7 @@ export default function Login() {
       localStorage.setItem("userEmail", userEmail);
       navigate("/dashboard");
     } catch {
-      setError("Credenciales inválidas");
+      setError("No se pudo obtener conexión con el backend. Por favor, verifica tus credenciales.");
     } finally {
       setLoading(false);
     }
